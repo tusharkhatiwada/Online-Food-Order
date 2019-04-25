@@ -1,5 +1,6 @@
 import React, { Component } from "react";
 import { createStackNavigator, createAppContainer } from "react-navigation";
+import SplashScreen from "react-native-splash-screen";
 
 import Login from "./src/Components/Login";
 import Orders from "./src/Components/Orders";
@@ -20,6 +21,9 @@ const AppNavigator = createStackNavigator({
 const AppContainer = createAppContainer(AppNavigator);
 
 export default class App extends Component {
+  componentDidMount() {
+    SplashScreen.hide();
+  }
   render() {
     return <AppContainer />;
   }

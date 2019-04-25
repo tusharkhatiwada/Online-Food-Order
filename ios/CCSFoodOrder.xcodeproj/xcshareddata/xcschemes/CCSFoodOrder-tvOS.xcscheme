@@ -29,9 +29,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "2D02E47A1E0B4A5D006451C7"
-               BuildableName = "CCSFoodOrder-tvOS.app"
-               BlueprintName = "CCSFoodOrder-tvOS"
-               ReferencedContainer = "container:CCSFoodOrder.xcodeproj">
+               BuildableName = "Food Orders-tvOS.app"
+               BlueprintName = "Food Orders-tvOS"
+               ReferencedContainer = "container:Food Orders.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
          <BuildActionEntry
@@ -43,9 +43,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "2D02E48F1E0B4A5D006451C7"
-               BuildableName = "CCSFoodOrder-tvOSTests.xctest"
-               BlueprintName = "CCSFoodOrder-tvOSTests"
-               ReferencedContainer = "container:CCSFoodOrder.xcodeproj">
+               BuildableName = "Food Orders-tvOSTests.xctest"
+               BlueprintName = "Food Orders-tvOSTests"
+               ReferencedContainer = "container:Food Orders.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -61,9 +61,9 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "2D02E48F1E0B4A5D006451C7"
-               BuildableName = "CCSFoodOrder-tvOSTests.xctest"
-               BlueprintName = "CCSFoodOrder-tvOSTests"
-               ReferencedContainer = "container:CCSFoodOrder.xcodeproj">
+               BuildableName = "Food Orders-tvOSTests.xctest"
+               BlueprintName = "Food Orders-tvOSTests"
+               ReferencedContainer = "container:Food Orders.xcodeproj">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -71,9 +71,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2D02E47A1E0B4A5D006451C7"
-            BuildableName = "CCSFoodOrder-tvOS.app"
-            BlueprintName = "CCSFoodOrder-tvOS"
-            ReferencedContainer = "container:CCSFoodOrder.xcodeproj">
+            BuildableName = "Food Orders-tvOS.app"
+            BlueprintName = "Food Orders-tvOS"
+            ReferencedContainer = "container:Food Orders.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <AdditionalOptions>
@@ -94,9 +94,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2D02E47A1E0B4A5D006451C7"
-            BuildableName = "CCSFoodOrder-tvOS.app"
-            BlueprintName = "CCSFoodOrder-tvOS"
-            ReferencedContainer = "container:CCSFoodOrder.xcodeproj">
+            BuildableName = "Food Orders-tvOS.app"
+            BlueprintName = "Food Orders-tvOS"
+            ReferencedContainer = "container:Food Orders.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
       <AdditionalOptions>
@@ -113,9 +113,9 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "2D02E47A1E0B4A5D006451C7"
-            BuildableName = "CCSFoodOrder-tvOS.app"
-            BlueprintName = "CCSFoodOrder-tvOS"
-            ReferencedContainer = "container:CCSFoodOrder.xcodeproj">
+            BuildableName = "Food Orders-tvOS.app"
+            BlueprintName = "Food Orders-tvOS"
+            ReferencedContainer = "container:Food Orders.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
