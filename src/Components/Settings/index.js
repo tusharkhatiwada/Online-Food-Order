@@ -5,7 +5,7 @@ export default class Settings extends React.Component {
   render() {
     return (
       <View style={styles.container}>
-        <Text>Settings</Text>
+        <Text style={{ fontSize: 30 }}>Settings Screen</Text>
       </View>
     );
   }
@@ -14,6 +14,7 @@ export default class Settings extends React.Component {
 const styles = StyleSheet.create({
   container: {
     display: "flex",
+    flex: 1,
     justifyContent: "center",
     alignItems: "center"
   }

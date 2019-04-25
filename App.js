@@ -7,6 +7,7 @@ import {
 } from "react-navigation";
 import { createMaterialBottomTabNavigator } from "react-navigation-material-bottom-tabs";
 import SplashScreen from "react-native-splash-screen";
+import Icon from "react-native-vector-icons/MaterialIcons";
 
 import Login from "./src/Components/Login";
 import Orders from "./src/Components/Orders";
@@ -43,7 +44,26 @@ const TabNavigator = createMaterialBottomTabNavigator(
     Settings: SettingsStack
   },
   {
-    labeled: true
+    defaultNavigationOptions: ({ navigation }) => ({
+      tabBarIcon: ({ focused, horizontal, tintColor }) => {
+        const { routeName } = navigation.state;
+        let IconComponent = Icon;
+        let iconName;
+        if (routeName === "Orders") {
+          iconName = `receipt`;
+        } else if (routeName === "Settings") {
+          iconName = `settings`;
+        } else {
+          iconName = `done`;
+        }
+        return <IconComponent name={iconName} size={25} color={tintColor} />;
+      }
+    }),
+    labeled: true,
+    activeColor: "#ffffff",
+    barStyle: {
+      backgroundColor: "#db2230"
+    }
   }
 );
 
