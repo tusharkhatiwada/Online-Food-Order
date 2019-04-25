@@ -1,21 +1,55 @@
 import React, { Component } from "react";
-import { createStackNavigator, createAppContainer } from "react-navigation";
+import {
+  createStackNavigator,
+  createBottomTabNavigator,
+  createSwitchNavigator,
+  createAppContainer
+} from "react-navigation";
+import { createMaterialBottomTabNavigator } from "react-navigation-material-bottom-tabs";
 import SplashScreen from "react-native-splash-screen";
 
 import Login from "./src/Components/Login";
 import Orders from "./src/Components/Orders";
 import Settings from "./src/Components/Settings";
 
-const AppNavigator = createStackNavigator({
-  Login: {
-    screen: Login
+const LoginStack = createStackNavigator(
+  {
+    LoginScreen: Login
   },
-  Orders: {
-    screen: Orders
-  },
-  Settings: {
-    screen: Settings
+  {
+    headerMode: "none"
   }
+);
+const OrdersStack = createStackNavigator(
+  {
+    OrdersScreen: Orders
+  },
+  {
+    headerMode: "none"
+  }
+);
+const SettingsStack = createStackNavigator(
+  {
+    SettingsScreen: Settings
+  },
+  {
+    headerMode: "none"
+  }
+);
+
+const TabNavigator = createMaterialBottomTabNavigator(
+  {
+    Orders: OrdersStack,
+    Settings: SettingsStack
+  },
+  {
+    labeled: true
+  }
+);
+
+const AppNavigator = createSwitchNavigator({
+  Auth: LoginStack,
+  Home: TabNavigator
 });
 
 const AppContainer = createAppContainer(AppNavigator);

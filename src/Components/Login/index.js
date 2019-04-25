@@ -1,11 +1,12 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, Button } from "react-native";
 
 export default class Login extends React.Component {
   render() {
     return (
       <View style={styles.container}>
         <Text>Login</Text>
+        <Button title="Go To Home" onPress={() => this.props.navigation.navigate("Home")} />
       </View>
     );
   }

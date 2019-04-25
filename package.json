@@ -1,5 +1,5 @@
 {
-  "name": "Food Orders",
+  "name": "FoodOrders",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -10,8 +10,11 @@
     "react": "16.8.3",
     "react-native": "0.59.5",
     "react-native-gesture-handler": "^1.1.0",
+    "react-native-paper": "^2.15.2",
     "react-native-splash-screen": "^3.2.0",
-    "react-navigation": "^3.8.1"
+    "react-native-vector-icons": "^6.4.2",
+    "react-navigation": "^3.8.1",
+    "react-navigation-material-bottom-tabs": "^1.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.4.3",
