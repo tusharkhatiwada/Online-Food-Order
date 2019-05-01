@@ -1,9 +1,11 @@
 import React, { Component } from "react";
+import { StatusBar } from "react-native";
 import {
   createStackNavigator,
   createBottomTabNavigator,
   createSwitchNavigator,
-  createAppContainer
+  createAppContainer,
+  SafeAreaView
 } from "react-navigation";
 import { createMaterialBottomTabNavigator } from "react-navigation-material-bottom-tabs";
 import SplashScreen from "react-native-splash-screen";
@@ -29,14 +31,9 @@ const OrdersStack = createStackNavigator(
     headerMode: "none"
   }
 );
-const SettingsStack = createStackNavigator(
-  {
-    SettingsScreen: Settings
-  },
-  {
-    headerMode: "none"
-  }
-);
+const SettingsStack = createStackNavigator({
+  SettingsScreen: Settings
+});
 
 const TabNavigator = createMaterialBottomTabNavigator(
   {
@@ -79,6 +76,11 @@ export default class App extends Component {
     SplashScreen.hide();
   }
   render() {
-    return <AppContainer />;
+    return (
+      <SafeAreaView style={{ flex: 1 }}>
+        <StatusBar barStyle="light-content" backgroundColor="#db2230" />
+        <AppContainer />
+      </SafeAreaView>
+    );
   }
 }
