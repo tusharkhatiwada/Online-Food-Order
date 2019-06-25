@@ -297,18 +297,26 @@ export default class Settings extends Component {
   };
 
   render() {
-    const { pairedDs, foundDs, bleOpened, name } = this.state;
-    return (
-      <ScrollView style={styles.container}>
-        <View style={styles.connected}>
-          <Text style={{ fontWeight: "500", color: "black" }}>Connected Printer: </Text>
-          <Text style={{ color: "#343434" }}>{name ? name : "No Printers connected"}</Text>
+    const { pairedDs, foundDs, bleOpened, name, loading } = this.state;
+    if (loading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#db2230" />
         </View>
-        {this._renderRow(pairedDs, "paired")}
-        {this._renderRow(foundDs, "found")}
-        {!bleOpened && this.renderEnableBluetooth()}
-      </ScrollView>
-    );
+      );
+    } else {
+      return (
+        <ScrollView style={styles.container}>
+          <View style={styles.connected}>
+            <Text style={{ fontWeight: "500", color: "black" }}>Connected Printer: </Text>
+            <Text style={{ color: "#343434" }}>{name ? name : "No Printers connected"}</Text>
+          </View>
+          {this._renderRow(pairedDs, "paired")}
+          {this._renderRow(foundDs, "found")}
+          {!bleOpened && this.renderEnableBluetooth()}
+        </ScrollView>
+      );
+    }
   }
 }
 
@@ -357,5 +365,11 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     marginHorizontal: 5,
     padding: 10
+  },
+  loadingContainer: {
+    display: "flex",
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center"
   }
 });

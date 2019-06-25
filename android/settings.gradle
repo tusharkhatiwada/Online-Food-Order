@@ -1,4 +1,6 @@
 rootProject.name = 'Food Orders'
+include ':react-native-webview'
+project(':react-native-webview').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-webview/android')
 include ':react-native-bluetooth-escpos-printer'
 project(':react-native-bluetooth-escpos-printer').projectDir = new File(rootProject.projectDir, '../node_modules/react-native-bluetooth-escpos-printer/android')
 include ':react-native-splash-screen'

@@ -1,12 +1,19 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, ActivityIndicator, StyleSheet } from "react-native";
+import { WebView } from "react-native-webview";
 
 export default class Orders extends React.Component {
   render() {
     return (
-      <View style={styles.container}>
-        <Text style={{ fontSize: 30 }}>Orders Screen</Text>
-      </View>
+      <WebView
+        source={{ uri: "https://www.customcontactsolutions.com/" }}
+        startInLoadingState={true}
+        renderLoading={() => (
+          <View style={styles.container}>
+            <ActivityIndicator size="large" color="#db2230" />
+          </View>
+        )}
+      />
     );
   }
 }
