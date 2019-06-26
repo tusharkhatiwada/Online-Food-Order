@@ -10,9 +10,9 @@ import logo from "../../assets/icon.png";
 const Login = () => {
   const { navigate } = useNavigation();
   const [inputs, setInputs] = useState({
-    email: "",
-    password: "",
-    key: ""
+    email: "mike@ccslondon.ca",
+    password: "lupo1111",
+    key: "f5eaf7762f31"
   });
   const [error, setError] = useState(null);
   const [loading, toggleLoading] = useState(false);
