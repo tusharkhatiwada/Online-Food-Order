@@ -1,27 +1,94 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Image, TextInput } from "react-native";
+import axios from "axios";
+import AsyncStorage from "@react-native-community/async-storage";
+import { NavigationActions } from "react-navigation";
+import { useNavigation } from "react-navigation-hooks";
 
 import logo from "../../assets/icon.png";
 
-export default class Login extends React.Component {
-  render() {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loginBox}>
-          <Image source={logo} resizeMethod="auto" resizeMode="contain" style={styles.logo} />
-          <TextInput placeholder="Username" autoCapitalize="none" style={styles.input} />
-          <TextInput placeholder="Password" secureTextEntry style={styles.input} />
-          <TouchableOpacity
-            style={styles.button}
-            onPress={() => this.props.navigation.navigate("Home")}
-          >
-            <Text style={styles.btnText}>Login</Text>
-          </TouchableOpacity>
-        </View>
+const Login = () => {
+  const { navigate } = useNavigation();
+  const [inputs, setInputs] = useState({
+    email: "mike@ccslondon.ca",
+    password: "lupo1111",
+    key: "f5eaf7762f31"
+  });
+  const [error, setError] = useState(null);
+  const [loading, toggleLoading] = useState(false);
+
+  const handleInputChange = (name, value) => {
+    setInputs({ ...inputs, [name]: value });
+  };
+
+  const handleLogin = () => {
+    toggleLoading(true);
+    axios
+      .post("/Tokens", {
+        email: inputs.email,
+        password: inputs.password,
+        key: inputs.key
+      })
+      .then(response => {
+        const res = response.data;
+        if (res && res.token) {
+          storeToken(res.token);
+        } else {
+          setError("Error! Please try again");
+        }
+      })
+      .catch(err => {
+        setError("Error! Please try again");
+        console.log("Error on login: ", { err });
+      });
+  };
+
+  const storeToken = async token => {
+    try {
+      await AsyncStorage.setItem("@ccs_token", token);
+      await toggleLoading(false);
+      await navigate("Home");
+    } catch (e) {
+      setError("Error! Please try again");
+    }
+  };
+  return (
+    <View style={styles.container}>
+      <View style={styles.loginBox}>
+        <Image source={logo} resizeMethod="auto" resizeMode="contain" style={styles.logo} />
+        <TextInput
+          placeholder="Email"
+          autoCapitalize="none"
+          value={inputs.email}
+          onChangeText={text => handleInputChange("email", text)}
+          style={styles.input}
+        />
+        <TextInput
+          placeholder="Password"
+          secureTextEntry
+          value={inputs.password}
+          onChangeText={text => handleInputChange("password", text)}
+          style={styles.input}
+        />
+        <TextInput
+          placeholder="Key"
+          autoCapitalize="none"
+          value={inputs.key}
+          onChangeText={text => handleInputChange("key", text)}
+          style={styles.input}
+        />
+        {error && <Text style={styles.error}>{error}</Text>}
+        <TouchableOpacity
+          disabled={loading}
+          style={[styles.button, { opacity: loading ? 0.6 : 1 }]}
+          onPress={() => handleLogin()}
+        >
+          <Text style={styles.btnText}>Login</Text>
+        </TouchableOpacity>
       </View>
-    );
-  }
-}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -63,5 +130,13 @@ const styles = StyleSheet.create({
   btnText: {
     color: "white",
     fontSize: 20
+  },
+  error: {
+    color: "firebrick",
+    fontSize: 14,
+    paddingVertical: 5,
+    textAlign: "center"
   }
 });
+
+export default Login;

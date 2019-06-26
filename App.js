@@ -1,19 +1,24 @@
-import React, { Component } from "react";
+import React, { useEffect, useRef } from "react";
 import { StatusBar } from "react-native";
 import {
   createStackNavigator,
   createBottomTabNavigator,
   createSwitchNavigator,
   createAppContainer,
-  SafeAreaView
+  SafeAreaView,
+  NavigationActions
 } from "react-navigation";
 import { createMaterialBottomTabNavigator } from "react-navigation-material-bottom-tabs";
 import SplashScreen from "react-native-splash-screen";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import axios from "axios";
+import AsyncStorage from "@react-native-community/async-storage";
 
 import Login from "./src/Components/Login";
 import Orders from "./src/Components/Orders";
 import Settings from "./src/Components/Settings";
+
+axios.defaults.baseURL = "https://foodordering.ca/api/Gateway";
 
 const LoginStack = createStackNavigator(
   {
@@ -71,16 +76,29 @@ const AppNavigator = createSwitchNavigator({
 
 const AppContainer = createAppContainer(AppNavigator);
 
-export default class App extends Component {
-  componentDidMount() {
+const App = () => {
+  const navigator = useRef(null);
+  useEffect(() => {
     SplashScreen.hide();
-  }
-  render() {
-    return (
-      <SafeAreaView style={{ flex: 1 }}>
-        <StatusBar barStyle="light-content" backgroundColor="#db2230" />
-        <AppContainer />
-      </SafeAreaView>
-    );
-  }
-}
+    getToken();
+  });
+  const getToken = async () => {
+    try {
+      const token = await AsyncStorage.getItem("@ccs_token");
+      if (token !== null) {
+        navigator.current.dispatch(NavigationActions.navigate({ routeName: "Home" }));
+      }
+    } catch (e) {
+      alert("App error token");
+      // error reading value
+    }
+  };
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <StatusBar barStyle="light-content" backgroundColor="#db2230" />
+      <AppContainer ref={navigator} />
+    </SafeAreaView>
+  );
+};
+
+export default App;
