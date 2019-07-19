@@ -81,6 +81,7 @@ project.ext.vectoricons = [
 ]
 
 apply from: "../../node_modules/react-native/react.gradle"
+apply from: "../../node_modules/react-native-sentry/sentry.gradle"
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
 
 /**
@@ -113,6 +114,16 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    signingConfigs {
+        release {
+            if (project.hasProperty('MIKE_PRINT_RELEASE_STORE_FILE')) {
+                storeFile file(MIKE_PRINT_RELEASE_STORE_FILE)
+                storePassword MIKE_PRINT_RELEASE_STORE_PASSWORD
+                keyAlias MIKE_PRINT_RELEASE_KEY_ALIAS
+                keyPassword MIKE_PRINT_RELEASE_KEY_PASSWORD
+            }
+        }
+    }
     splits {
         abi {
             reset()
@@ -125,6 +136,7 @@ android {
         release {
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            signingConfig signingConfigs.release
         }
     }
     // applicationVariants are e.g. debug, release
@@ -143,6 +155,7 @@ android {
 }
 
 dependencies {
+    implementation project(':react-native-sentry')
     implementation project(':@react-native-community_async-storage')
     implementation project(':react-native-webview')
     implementation project(':react-native-bluetooth-escpos-printer')

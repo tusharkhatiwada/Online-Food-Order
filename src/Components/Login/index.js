@@ -23,6 +23,7 @@ const Login = () => {
 
   const handleLogin = () => {
     toggleLoading(true);
+    setError(null);
     axios
       .post("/Tokens", {
         email: inputs.email,
@@ -32,13 +33,16 @@ const Login = () => {
       .then(response => {
         const res = response.data;
         if (res && res.token) {
+          axios.defaults.headers.common["Authorization"] = `Bearer ${res.token}`;
           storeToken(res.token);
         } else {
           setError("Error! Please try again");
+          toggleLoading(false);
         }
       })
       .catch(err => {
         setError("Error! Please try again");
+        toggleLoading(false);
         console.log("Error on login: ", { err });
       });
   };

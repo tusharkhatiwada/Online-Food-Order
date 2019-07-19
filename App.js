@@ -16,7 +16,13 @@ import AsyncStorage from "@react-native-community/async-storage";
 
 import Login from "./src/Components/Login";
 import Orders from "./src/Components/Orders";
+import OrderDetails from "./src/Components/Orders/details";
 import Settings from "./src/Components/Settings";
+
+import { Sentry } from 'react-native-sentry';
+
+Sentry.config('https://f9b9477c69384f85b1e48f854f9c5678@sentry.io/1504247').install();
+
 
 axios.defaults.baseURL = "https://foodordering.ca/api/Gateway";
 
@@ -33,9 +39,23 @@ const OrdersStack = createStackNavigator(
     OrdersScreen: Orders
   },
   {
-    headerMode: "none"
+    defaultNavigationOptions: ({ navigation }) => ({
+      title: "Orders",
+      headerStyle: {
+        backgroundColor: "rgba(219, 34, 48, 1)"
+      },
+      headerTitleContainerStyle: {
+        backgroundColor: "rgba(219, 34, 48, 1)",
+        elevation: 0,
+        right: 0
+      },
+      headerTintColor: "#fff"
+    })
   }
 );
+const OrderDetailsStack = createStackNavigator({
+  OrderDetails: OrderDetails
+});
 const SettingsStack = createStackNavigator({
   SettingsScreen: Settings
 });
@@ -71,7 +91,8 @@ const TabNavigator = createMaterialBottomTabNavigator(
 
 const AppNavigator = createSwitchNavigator({
   Auth: LoginStack,
-  Home: TabNavigator
+  Home: TabNavigator,
+  OrderDetailsStack: OrderDetailsStack
 });
 
 const AppContainer = createAppContainer(AppNavigator);
@@ -86,6 +107,7 @@ const App = () => {
     try {
       const token = await AsyncStorage.getItem("@ccs_token");
       if (token !== null) {
+        axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
         navigator.current.dispatch(NavigationActions.navigate({ routeName: "Home" }));
       }
     } catch (e) {

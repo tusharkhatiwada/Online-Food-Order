@@ -30,7 +30,7 @@ export default class Settings extends Component {
     return {
       title: "Bluetooth Printers",
       headerTitleContainerStyle: {
-        backgroundColor: "rgba(219, 34, 48, 0.9)",
+        backgroundColor: "rgba(219, 34, 48, 1)",
         elevation: 0,
         right: 0
       },
@@ -54,7 +54,8 @@ export default class Settings extends Component {
     bleOpened: true,
     loading: true,
     boundAddress: "",
-    debugMsg: ""
+    debugMsg: "",
+    name: ""
   };
 
   componentDidMount() {
