@@ -3,10 +3,11 @@ package com.ccs.foodorder;
 import android.app.Application;
 
 import com.facebook.react.ReactApplication;
+import com.rusel.RCTBluetoothSerial.*;
 import io.sentry.RNSentryPackage;
 import com.reactnativecommunity.asyncstorage.AsyncStoragePackage;
 import com.reactnativecommunity.webview.RNCWebViewPackage;
-import cn.jystudio.bluetooth.RNBluetoothEscposPrinterPackage;
+// import cn.jystudio.bluetooth.RNBluetoothEscposPrinterPackage;
 import org.devio.rn.splashscreen.SplashScreenReactPackage;
 import com.swmansion.gesturehandler.react.RNGestureHandlerPackage;
 import com.facebook.react.ReactNativeHost;
@@ -29,10 +30,11 @@ public class MainApplication extends Application implements ReactApplication {
     protected List<ReactPackage> getPackages() {
       return Arrays.<ReactPackage>asList(
           new MainReactPackage(),
+            new RCTBluetoothSerialPackage(),
             new RNSentryPackage(),
             new AsyncStoragePackage(),
             new RNCWebViewPackage(),
-            new RNBluetoothEscposPrinterPackage(),
+            // new RNBluetoothEscposPrinterPackage(),
             new SplashScreenReactPackage(),
             new RNGestureHandlerPackage()
       );

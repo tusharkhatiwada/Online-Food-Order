@@ -1,10 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { View, ScrollView, Text, StyleSheet, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  ScrollView,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  ToastAndroid
+} from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import { useNavigationParam, useNavigationEvents } from "react-navigation-hooks";
 import axios from "axios";
-import { BluetoothEscposPrinter } from "react-native-bluetooth-escpos-printer";
+// import { BluetoothEscposPrinter } from "react-native-bluetooth-escpos-printer";
+import BluetoothSerial from "react-native-bluetooth-serial";
 import { Sentry } from "react-native-sentry";
+import { table, getBorderCharacters } from "table";
+import { EscPos } from "escpos-xml";
 
 const OrderDetails = ({ navigation }) => {
   const id = useNavigationParam("id");
@@ -12,221 +23,154 @@ const OrderDetails = ({ navigation }) => {
   const [orderDetail, setOrderDetail] = useState(null);
   const [error, setError] = useState(null);
   useEffect(() => {
+    checkPrinterConnection();
+  }, []);
+  useEffect(() => {
     fetchOrderDetails();
   }, []);
 
-  const printOrder = orderDetail => {
-    try {
-      BluetoothEscposPrinter.printerInit();
-      BluetoothEscposPrinter.printerLeftSpace(0);
+  const checkPrinterConnection = () => {
+    BluetoothSerial.isConnected()
+      .then(res => {
+        console.log("Connection Status: ", res);
+        if (!res) {
+          Alert.alert(
+            "Printer Not Connected",
+            "Please connect a bluetooth printer from the settings first"
+          );
+        }
+      })
+      .catch(err => {
+        console.log("Error connection status: ", err.message);
+      });
+  };
 
-      BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.CENTER);
-      BluetoothEscposPrinter.setBlob(0);
-      BluetoothEscposPrinter.printText(
-        `${orderDetail.type === "pickup" ? "TAKE-OUT" : "DELIVERY"}\r\n`,
-        {
-          encoding: "UTF-8",
-          codepage: 0,
-          widthtimes: 2,
-          heigthtimes: 2,
-          fonttype: 1
-        }
-      );
-      BluetoothEscposPrinter.setBlob(0);
-      BluetoothEscposPrinter.printText(`#${orderDetail.order_id}\r\n`, {
-        encoding: "UTF-8",
-        codepage: 0,
-        widthtimes: 2,
-        heigthtimes: 2,
-        fonttype: 1
-      });
-      BluetoothEscposPrinter.setBlob(1);
-      BluetoothEscposPrinter.printText(`${orderDetail.location.address}\r\n`, {
-        encoding: "UTF-8",
-        codepage: 0,
-        widthtimes: 1,
-        heigthtimes: 1,
-        fonttype: 1
-      });
-      BluetoothEscposPrinter.setBlob(0);
-      BluetoothEscposPrinter.printText(`${orderDetail.location.city}\r\n`, {
-        encoding: "UTF-8",
-        codepage: 0,
-        widthtimes: 1,
-        heigthtimes: 1,
-        fonttype: 1
-      });
-      BluetoothEscposPrinter.setBlob(0);
-      BluetoothEscposPrinter.printText(
-        `${orderDetail.location.state} ${orderDetail.location.zip}\r\n`,
-        {
-          encoding: "UTF-8",
-          codepage: 0,
-          widthtimes: 1,
-          heigthtimes: 1,
-          fonttype: 1
-        }
-      );
-      BluetoothEscposPrinter.setBlob(0);
-      BluetoothEscposPrinter.printText(`${orderDetail.location.telephone}\r\n`, {
-        encoding: "UTF-8",
-        codepage: 0,
-        widthtimes: 1,
-        heigthtimes: 1,
-        fonttype: 1
-      });
-      BluetoothEscposPrinter.printText("\r\n", {});
-      BluetoothEscposPrinter.setBlob(1);
-      BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-      BluetoothEscposPrinter.printText("CUSTOMER\r\n", {
-        encoding: "UTF-8",
-        codepage: 0,
-        widthtimes: 1,
-        heigthtimes: 1,
-        fonttype: 1
-      });
-      BluetoothEscposPrinter.setBlob(0);
-      BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-      BluetoothEscposPrinter.printText(
-        `${orderDetail.customer.first} ${orderDetail.customer.last}\r\n`,
-        {
-          encoding: "UTF-8",
-          codepage: 0,
-          widthtimes: 1,
-          heigthtimes: 1,
-          fonttype: 2
-        }
-      );
-      BluetoothEscposPrinter.setBlob(0);
-      BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-      BluetoothEscposPrinter.printText(`${orderDetail.customer.telephone} \r\n`, {
-        encoding: "UTF-8",
-        codepage: 0,
-        widthtimes: 1,
-        heigthtimes: 1,
-        fonttype: 2
-      });
-      BluetoothEscposPrinter.printText("--------------------------------\r\n", {});
-      let columnWidths = [5, 25, 6];
-      BluetoothEscposPrinter.printColumn(
-        columnWidths,
-        [
-          BluetoothEscposPrinter.ALIGN.LEFT,
-          BluetoothEscposPrinter.ALIGN.LEFT,
-          BluetoothEscposPrinter.ALIGN.RIGHT
-        ],
-        ["QTY", "ITEM", "COST"],
-        { encoding: "UTF-8", codepage: 0, widthtimes: 1, heigthtimes: 1, fonttype: 1 }
-      );
-      BluetoothEscposPrinter.printText("--------------------------------\r\n", {});
-      orderDetail.data.map(item => {
-        BluetoothEscposPrinter.printColumn(
-          columnWidths,
-          [
-            BluetoothEscposPrinter.ALIGN.LEFT,
-            BluetoothEscposPrinter.ALIGN.LEFT,
-            BluetoothEscposPrinter.ALIGN.RIGHT
-          ],
-          [item.cost.quantity, item.cost.item.item, item.cost.cost.final],
-          { encoding: "UTF-8", codepage: 0, widthtimes: 1, heigthtimes: 1, fonttype: 2 }
-        );
-        BluetoothEscposPrinter.printText("\r\n", {});
-        item.cart.prices.map(cp => {
-          BluetoothEscposPrinter.setBlob(1);
-          BluetoothEscposPrinter.printText("\r\n", {});
-          BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-          BluetoothEscposPrinter.printText(`**${cp.info.name}**\r\n`, {
-            encoding: "UTF-8",
-            codepage: 0,
-            widthtimes: 1,
-            heigthtimes: 1,
-            fonttype: 1
-          });
-          const toppingsArray = Object.values(cp.modules);
-          if (toppingsArray.length > 0) {
-            toppingsArray.map(top => {
-              BluetoothEscposPrinter.printText("\r\n", {});
-              BluetoothEscposPrinter.setBlob(0);
-              BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-              BluetoothEscposPrinter.printText(`${top.name}: \r\n`, {
-                encoding: "UTF-8",
-                codepage: 0,
-                widthtimes: 1,
-                heigthtimes: 1,
-                fonttype: 1
-              });
-              top.chosen
-                ? top.chosen.map(chosen => {
-                    BluetoothEscposPrinter.setBlob(0);
-                    BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-                    BluetoothEscposPrinter.printText(`${chosen.quantity}X ${chosen.name}, \r\n`, {
-                      encoding: "UTF-8",
-                      codepage: 0,
-                      widthtimes: 0.5,
-                      heigthtimes: 0.5,
-                      fonttype: 2
-                    });
-                  })
-                : top.toppings.map(t => {
-                    BluetoothEscposPrinter.setBlob(0);
-                    BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-                    BluetoothEscposPrinter.printText(`${t.topping} (${t.chosen.placement}), \r\n`, {
-                      encoding: "UTF-8",
-                      codepage: 0,
-                      widthtimes: 0.5,
-                      heigthtimes: 0.5,
-                      fonttype: 1
-                    });
-                  });
-            });
-          }
-        });
-        BluetoothEscposPrinter.printText("\r\n", {});
-        BluetoothEscposPrinter.printColumn(
-          [10, 15],
-          [BluetoothEscposPrinter.ALIGN.LEFT, BluetoothEscposPrinter.ALIGN.RIGHT],
-          ["SUBTOTAL", `${orderDetail.payment.totals.subtotal}`],
-          { encoding: "UTF-8", codepage: 0, widthtimes: 1, heigthtimes: 1, fonttype: 1 }
-        );
-        BluetoothEscposPrinter.printText("\r\n", {});
-        BluetoothEscposPrinter.printColumn(
-          [5, 20],
-          [BluetoothEscposPrinter.ALIGN.LEFT, BluetoothEscposPrinter.ALIGN.RIGHT],
-          ["TAX", `${orderDetail.payment.totals.tax}`],
-          { encoding: "UTF-8", codepage: 0, widthtimes: 1, heigthtimes: 1, fonttype: 1 }
-        );
-        BluetoothEscposPrinter.printText("\r\n", {});
-        BluetoothEscposPrinter.setBlob(0);
-        BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-        BluetoothEscposPrinter.printText("PAYMENT \r\n", {
-          encoding: "UTF-8",
-          codepage: 0,
-          widthtimes: 1,
-          heigthtimes: 1,
-          fonttype: 2
-        });
+  const orderDetailTable = details => {
+    const items = details.data;
+    let data, config, output;
+    let itemsTable = [];
 
-        BluetoothEscposPrinter.printText("\r\n", {});
-        BluetoothEscposPrinter.printColumn(
-          [8, 17],
-          [BluetoothEscposPrinter.ALIGN.LEFT, BluetoothEscposPrinter.ALIGN.RIGHT],
-          ["TOTAL", `${orderDetail.payment.totals.final}`],
-          { encoding: "UTF-8", codepage: 0, widthtimes: 1, heigthtimes: 1, fonttype: 1 }
+    items.map(item => {
+      itemsTable.push([
+        item.cost.quantity,
+        `${item.cost.item.item} (${parseFloat(item.cost.cost.final)})`,
+        `${Math.round(parseFloat(item.cost.cost.final) * parseFloat(item.cost.quantity) * 100) /
+          100}`
+      ]);
+    });
+
+    data = [["QTY", "ITEM", "COST"], ...itemsTable];
+
+    config = {
+      columns: {
+        0: {
+          alignment: "left"
+        },
+        1: {
+          alignment: "left",
+          width: 25
+        },
+        2: {
+          alignment: "right"
+        }
+      },
+      border: getBorderCharacters(`void`),
+      columnDefault: {
+        paddingLeft: 0,
+        paddingRight: 1
+      },
+      drawHorizontalLine: () => {
+        return false;
+      }
+    };
+    const priceConfig = {
+      columns: {
+        0: {
+          alignment: "left",
+          width: 10
+        },
+        1: {
+          alignment: "right",
+          width: 20
+        }
+      },
+      border: getBorderCharacters(`void`),
+      columnDefault: {
+        paddingLeft: 0,
+        paddingRight: 1
+      },
+      drawHorizontalLine: () => {
+        return false;
+      }
+    };
+    output = table(data, config);
+    let pricesTable = [
+      ["SUBTOTAL", details.payment.totals.subtotal],
+      ["TAX", details.payment.totals.tax],
+      ["TOTAL", details.payment.totals.final]
+    ];
+    let pricesOutput = table(pricesTable, priceConfig);
+    const xml = `
+    <?xml version="1.0" encoding="UTF-8"?>
+    <document>
+    <line-feed />
+    <align mode="center">
+      <bold>
+        <text-line size="1:0">{{header}}</text-line>
+      </bold>
+      <line-feed />
+      <text-line size="0:0">{{add1}}</text-line>
+      <text-line size="0:0">{{add2}}</text-line>
+      <text-line size="0:0">{{add3}}</text-line>
+      <text-line size="0:0">{{tel1}}</text-line>
+    </align>
+    <line-feed />
+      <bold>
+        <text-line size="1:0">CUSTOMER</text-line>
+      </bold>
+      <break-line />
+      <text-line size="0:0">{{customer}}</text-line>
+      <text-line size="0:0">{{tel2}}</text-line>
+    <line-feed />
+    <bold>
+      <text-line size="0:0">{{table}}</text-line>
+    </bold>
+    <line-feed />
+    <text-line size="0:0">{{pricesOutput}}</text-line>
+    <paper-cut/>
+    </document>
+    `;
+    const detailsData = {
+      header: `${details.type === "pickup" ? "TAKE-OUT" : "DELIVERY"} #${details.order_id}`,
+      add1: details.location.address,
+      add2: details.location.city,
+      add3: `${details.location.state} ${details.location.zip}`,
+      tel1: details.location.telephone,
+      customer: `${details.customer.first} ${details.customer.last}`,
+      tel2: details.customer.telephone,
+      subtotal: details.payment.totals.subtotal,
+      tax: details.payment.totals.tax,
+      total: details.payment.totals.final,
+      table: output,
+      pricesOutput: pricesOutput
+    };
+
+    const buffer = EscPos.getBufferFromTemplate(xml, detailsData);
+
+    BluetoothSerial.write(buffer)
+      .then(res => {
+        console.log("Print: ", res);
+        ToastAndroid.showWithGravity(
+          "Print successful",
+          ToastAndroid.LONG,
+          ToastAndroid.BOTTOM,
+          25,
+          50
         );
-        BluetoothEscposPrinter.printText("\r\n", {});
-        BluetoothEscposPrinter.setBlob(0);
-        BluetoothEscposPrinter.printerAlign(BluetoothEscposPrinter.ALIGN.LEFT);
-        BluetoothEscposPrinter.printText(
-          `Pay in person ${orderDetail.payment.method === "cod" ? "(Delivery)" : ""} \r\n`,
-          { encoding: "UTF-8", codepage: 0, widthtimes: 1, heigthtimes: 1, fonttype: 2 }
-        );
-        BluetoothEscposPrinter.printText("\r\n", {});
+      })
+      .catch(err => {
+        Sentry.captureException(err);
       });
-    } catch (e) {
-      Sentry.captureException(e);
-      console.log("Error printing: ", e);
-      Alert.alert("Error", "Error printing receipt");
-    }
   };
 
   const fetchOrderDetails = () => {
@@ -237,7 +181,7 @@ const OrderDetails = ({ navigation }) => {
           const res = response.data;
           setOrderDetail(res);
           toggleLoading(false);
-          navigation.setParams({ print: () => printOrder(res) });
+          navigation.setParams({ print: () => orderDetailTable(res) });
         } else {
           toggleLoading(false);
           setError("Error getting order details");
