@@ -16,6 +16,7 @@ import BluetoothSerial from "react-native-bluetooth-serial";
 import { Sentry } from "react-native-sentry";
 import { table, getBorderCharacters } from "table";
 import { EscPos } from "escpos-xml";
+import chalk from "chalk";
 
 const OrderDetails = ({ navigation }) => {
   const id = useNavigationParam("id");
@@ -45,30 +46,63 @@ const OrderDetails = ({ navigation }) => {
       });
   };
 
+  const generateItemRow = item => {
+    return `${item.cost.item.item}\n${cartInfo(item.cart)}\n${
+      item.cost.item.note.length > 0 ? `\nCUSTOMER NOTE\n${item.cost.item.note}\n` : ""
+    }`;
+  };
+
+  const cartInfo = cart => {
+    return cart.prices
+      .map(cp => {
+        return `\n${cp.info.name.length > 0 ? `**${cp.info.name}**\n` : ``}\n${toppingsInfo(
+          cp.modules
+        )}`;
+      })
+      .join("\n");
+  };
+
+  const toppingsInfo = toppings => {
+    const toppingsArray = Object.values(toppings);
+    return toppingsArray
+      .map(top => {
+        return `${top.name}\n${
+          top.chosen
+            ? top.chosen
+                .map(chosen => {
+                  return ` ${chosen.name}`;
+                })
+                .join("\n")
+            : top.toppings
+                .map(t => {
+                  return ` ${t.topping} (${t.chosen.placement})`;
+                })
+                .join("\n")
+        }`;
+      })
+      .join("\n");
+  };
+
   const orderDetailTable = details => {
     const items = details.data;
-    let data, config, output;
     let itemsTable = [];
 
     items.map(item => {
       itemsTable.push([
         item.cost.quantity,
-        `${item.cost.item.item} (${parseFloat(item.cost.cost.final)})`,
+        generateItemRow(item),
         `${Math.round(parseFloat(item.cost.cost.final) * parseFloat(item.cost.quantity) * 100) /
           100}`
       ]);
     });
 
-    data = [["QTY", "ITEM", "COST"], ...itemsTable];
+    let data = [["QTY", "ITEM", "COST"], ...itemsTable];
 
-    config = {
+    const config = {
       columns: {
-        0: {
-          alignment: "left"
-        },
+        0: {},
         1: {
-          alignment: "left",
-          width: 25
+          width: 21
         },
         2: {
           alignment: "right"
@@ -86,12 +120,11 @@ const OrderDetails = ({ navigation }) => {
     const priceConfig = {
       columns: {
         0: {
-          alignment: "left",
-          width: 10
+          width: 22
         },
         1: {
           alignment: "right",
-          width: 20
+          width: 8
         }
       },
       border: getBorderCharacters(`void`),
@@ -103,41 +136,76 @@ const OrderDetails = ({ navigation }) => {
         return false;
       }
     };
-    output = table(data, config);
+    let output = table(data, config);
     let pricesTable = [
       ["SUBTOTAL", details.payment.totals.subtotal],
       ["TAX", details.payment.totals.tax],
       ["TOTAL", details.payment.totals.final]
     ];
+    if (details.payment.totals.discount != "0.00") {
+      pricesTable.splice(1, 0, ["DISCOUNT", details.payment.totals.discount]);
+    }
+    if (details.payment.totals.tip != "0.00") {
+      pricesTable.splice(pricesTable.length - 1, 0, ["TIPS", details.payment.totals.tip]);
+    }
+    if (details.payment.totals.fee.usage != "0.00") {
+      pricesTable.splice(pricesTable.length - 1, 0, [
+        "CONVENIENCE FEE",
+        details.payment.totals.fee.usage
+      ]);
+    }
     let pricesOutput = table(pricesTable, priceConfig);
     const xml = `
     <?xml version="1.0" encoding="UTF-8"?>
     <document>
-    <line-feed />
-    <align mode="center">
-      <bold>
-        <text-line size="1:0">{{header}}</text-line>
-      </bold>
       <line-feed />
-      <text-line size="0:0">{{add1}}</text-line>
-      <text-line size="0:0">{{add2}}</text-line>
-      <text-line size="0:0">{{add3}}</text-line>
-      <text-line size="0:0">{{tel1}}</text-line>
-    </align>
-    <line-feed />
+      <align mode="center">
+          <bold>
+            <text-line size="1:0">{{header}}</text-line>
+          </bold>
+          <line-feed />
+          <text-line size="0:0">{{add1}}</text-line>
+          <text-line size="0:0">{{add2}}</text-line>
+          <text-line size="0:0">{{add3}}</text-line>
+          <text-line size="0:0">{{tel1}}</text-line>
+      </align>
+      <line-feed />
       <bold>
-        <text-line size="1:0">CUSTOMER</text-line>
+          <text-line size="1:0">CUSTOMER</text-line>
       </bold>
-      <break-line />
+      <break-line lines="2" />
       <text-line size="0:0">{{customer}}</text-line>
+      {{#if showDelivery}}
+      <text-line size="0:0">{{custAdd1}}</text-line>
+      <text-line size="0:0">{{custAdd2}}</text-line>
+      {{/if}}
       <text-line size="0:0">{{tel2}}</text-line>
-    <line-feed />
-    <bold>
-      <text-line size="0:0">{{table}}</text-line>
-    </bold>
-    <line-feed />
-    <text-line size="0:0">{{pricesOutput}}</text-line>
-    <paper-cut/>
+      <line-feed />
+      <bold>
+          <text-line size="1:0">Payment Method</text-line>
+      </bold>
+      <break-line lines="2" />
+      <text-line size="0:0">{{paymentMethod}}</text-line>
+      <line-feed />
+      <bold>
+          <text-line size="1:0">Order Date</text-line>
+      </bold>
+      <break-line lines="2" />
+      <text-line size="0:0">{{orderDate}}</text-line>
+      {{#if isFutureDate}}
+      <line-feed />
+      <bold>
+          <text-line size="1:0">Future Order</text-line>
+      </bold>
+      <break-line lines="2" />
+      <text-line size="0:0">{{futureDate}}</text-line>
+      {{/if}}
+      <line-feed />
+      <align mode="left">
+        <text-line size="0:0">{{table}}</text-line>
+      </align>
+      <line-feed />
+      <text-line size="0:0">{{pricesOutput}}</text-line>
     </document>
     `;
     const detailsData = {
@@ -148,11 +216,24 @@ const OrderDetails = ({ navigation }) => {
       tel1: details.location.telephone,
       customer: `${details.customer.first} ${details.customer.last}`,
       tel2: details.customer.telephone,
+      custAdd1: `${details.customer.address.street_number} ${details.customer.address.street}`,
+      custAdd2: `${details.customer.address.city}, ${details.customer.address.state} ${
+        details.customer.address.zipcode
+      }`,
       subtotal: details.payment.totals.subtotal,
       tax: details.payment.totals.tax,
       total: details.payment.totals.final,
       table: output,
-      pricesOutput: pricesOutput
+      pricesOutput: pricesOutput,
+      orderDate: details.local_date,
+      futureDate: details.payment.order_when.date,
+      isFutureDate: details.payment.order_when.date ? true : false,
+      paymentMethod: `${
+        details.payment.method === "cod"
+          ? `Pay on Delivery (${details.payment.details})`
+          : "Pay in Person"
+      }`,
+      showDelivery: details.payment.method === "cod" ? true : false
     };
 
     const buffer = EscPos.getBufferFromTemplate(xml, detailsData);
@@ -324,6 +405,21 @@ const OrderDetails = ({ navigation }) => {
                       {renderToppings(cp.modules)}
                     </View>
                   ))}
+                  {item.cost.item.note.length > 0 && (
+                    <View>
+                      <Text
+                        style={{
+                          fontWeight: "bold",
+                          color: "black",
+                          paddingTop: 8,
+                          paddingBottom: 3
+                        }}
+                      >
+                        CUSTOMER NOTE
+                      </Text>
+                      <Text style={{ paddingLeft: 8 }}>{item.cost.item.note}</Text>
+                    </View>
+                  )}
                 </View>
                 <Text style={[styles.td, { flex: 1, textAlign: "right" }]}>
                   {Math.round(
@@ -341,6 +437,15 @@ const OrderDetails = ({ navigation }) => {
               {orderDetail.payment.totals.subtotal}
             </Text>
           </View>
+          {orderDetail.payment.totals.discount != "0.00" && (
+            <View style={styles.summaryFooter}>
+              <Text style={[styles.th, { flex: 1 }]} />
+              <Text style={[styles.th, { flex: 3 }]}>DISCOUNT</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                {orderDetail.payment.totals.discount}
+              </Text>
+            </View>
+          )}
           <View style={styles.summaryFooter}>
             <Text style={[styles.th, { flex: 1 }]} />
             <Text style={[styles.th, { flex: 3 }]}>TAX</Text>
@@ -348,6 +453,24 @@ const OrderDetails = ({ navigation }) => {
               {orderDetail.payment.totals.tax}
             </Text>
           </View>
+          {orderDetail.payment.totals.tip != "0.00" && (
+            <View style={styles.summaryFooter}>
+              <Text style={[styles.th, { flex: 1 }]} />
+              <Text style={[styles.th, { flex: 3 }]}>TIPS</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                {orderDetail.payment.totals.tip}
+              </Text>
+            </View>
+          )}
+          {orderDetail.payment.totals.fee.usage != "0.00" && (
+            <View style={styles.summaryFooter}>
+              <Text style={[styles.th, { flex: 1 }]} />
+              <Text style={[styles.th, { flex: 3 }]}>CONVENIENCE FEE</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                {orderDetail.payment.totals.fee.usage}
+              </Text>
+            </View>
+          )}
           <View style={styles.summaryFooter}>
             <Text style={[styles.th, { flex: 1 }]} />
             <Text style={[styles.th, { flex: 3 }]}>TOTAL</Text>
