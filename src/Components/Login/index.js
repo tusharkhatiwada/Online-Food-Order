@@ -11,8 +11,7 @@ const Login = () => {
   const { navigate } = useNavigation();
   const [inputs, setInputs] = useState({
     email: "",
-    password: "",
-    key: ""
+    password: ""
   });
   const [error, setError] = useState(null);
   const [loading, toggleLoading] = useState(false);
@@ -25,15 +24,23 @@ const Login = () => {
     toggleLoading(true);
     setError(null);
     axios
-      .post("/Tokens", {
-        email: inputs.email,
-        password: inputs.password,
-        key: inputs.key
-      })
+      .post(
+        "/Login/login",
+        {
+          email: inputs.email,
+          password: inputs.password
+        },
+        {
+          headers: {
+            "Content-Type": "application/json"
+          }
+        }
+      )
       .then(response => {
         const res = response.data;
+        console.log("Token: ", res);
         if (res && res.token) {
-          axios.defaults.headers.common["Authorization"] = `Bearer ${res.token}`;
+          axios.defaults.headers.common["Content-Type"] = "application/json";
           storeToken(res.token);
         } else {
           setError("Error! Please try again");
@@ -72,13 +79,6 @@ const Login = () => {
           secureTextEntry
           value={inputs.password}
           onChangeText={text => handleInputChange("password", text)}
-          style={styles.input}
-        />
-        <TextInput
-          placeholder="Key"
-          autoCapitalize="none"
-          value={inputs.key}
-          onChangeText={text => handleInputChange("key", text)}
           style={styles.input}
         />
         {error && <Text style={styles.error}>{error}</Text>}

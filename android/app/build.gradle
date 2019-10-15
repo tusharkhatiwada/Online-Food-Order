@@ -83,6 +83,7 @@ project.ext.vectoricons = [
 apply from: "../../node_modules/react-native/react.gradle"
 apply from: "../../node_modules/react-native-sentry/sentry.gradle"
 apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
+apply from: '../../node_modules/react-native-unimodules/gradle.groovy'
 
 /**
  * Set this to true to create two separate APKs instead of one:
@@ -155,6 +156,10 @@ android {
 }
 
 dependencies {
+    implementation project(':react-native-push-notification')
+    implementation project(':react-native-bluetooth-status')
+    addUnimodulesDependencies()
+    implementation project(':@react-native-community_netinfo')
     implementation project(':react-native-bluetooth-serial')
     implementation project(':react-native-sentry')
     implementation project(':@react-native-community_async-storage')

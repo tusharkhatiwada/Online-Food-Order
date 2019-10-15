@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useContext } from "react";
 import {
   View,
   ScrollView,
@@ -9,6 +9,7 @@ import {
   ToastAndroid
 } from "react-native";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import AsyncStorage from "@react-native-community/async-storage";
 import { useNavigationParam, useNavigationEvents } from "react-navigation-hooks";
 import axios from "axios";
 // import { BluetoothEscposPrinter } from "react-native-bluetooth-escpos-printer";
@@ -17,12 +18,21 @@ import { Sentry } from "react-native-sentry";
 import { table, getBorderCharacters } from "table";
 import { EscPos } from "escpos-xml";
 import chalk from "chalk";
+import { useKeepAwake } from "expo-keep-awake";
+import printReceipt from "../../helpers/printReceipt";
+
+import { NetworkContext } from "../../helpers/networkProvider";
 
 const OrderDetails = ({ navigation }) => {
+  const networkStatus = useContext(NetworkContext);
+  useKeepAwake();
   const id = useNavigationParam("id");
   const [loading, toggleLoading] = useState(true);
   const [orderDetail, setOrderDetail] = useState(null);
   const [error, setError] = useState(null);
+  useEffect(() => {
+    networkStatus.checkConnection();
+  }, []);
   useEffect(() => {
     checkPrinterConnection();
   }, []);
@@ -35,10 +45,7 @@ const OrderDetails = ({ navigation }) => {
       .then(res => {
         console.log("Connection Status: ", res);
         if (!res) {
-          Alert.alert(
-            "Printer Not Connected",
-            "Please connect a bluetooth printer from the settings first"
-          );
+          autoConnectPrinter();
         }
       })
       .catch(err => {
@@ -46,212 +53,23 @@ const OrderDetails = ({ navigation }) => {
       });
   };
 
-  const generateItemRow = item => {
-    return `${item.cost.item.item}\n${cartInfo(item.cart)}\n${
-      item.cost.item.note.length > 0 ? `\nCUSTOMER NOTE\n${item.cost.item.note}\n` : ""
-    }`;
-  };
-
-  const cartInfo = cart => {
-    return cart.prices
-      .map(cp => {
-        return `\n${cp.info.name.length > 0 ? `**${cp.info.name}**\n` : ``}\n${toppingsInfo(
-          cp.modules
-        )}`;
-      })
-      .join("\n");
-  };
-
-  const toppingsInfo = toppings => {
-    const toppingsArray = Object.values(toppings);
-    return toppingsArray
-      .map(top => {
-        return `${top.name}\n${
-          top.chosen
-            ? top.chosen
-                .map(chosen => {
-                  return ` ${chosen.name}`;
-                })
-                .join("\n")
-            : top.toppings
-                .map(t => {
-                  return ` ${t.topping} (${t.chosen.placement})`;
-                })
-                .join("\n")
-        }`;
-      })
-      .join("\n");
-  };
-
-  const orderDetailTable = details => {
-    const items = details.data;
-    let itemsTable = [];
-
-    items.map(item => {
-      itemsTable.push([
-        item.cost.quantity,
-        generateItemRow(item),
-        `${Math.round(parseFloat(item.cost.cost.final) * parseFloat(item.cost.quantity) * 100) /
-          100}`
-      ]);
-    });
-
-    let data = [["QTY", "ITEM", "COST"], ...itemsTable];
-
-    const config = {
-      columns: {
-        0: {},
-        1: {
-          width: 21
-        },
-        2: {
-          alignment: "right"
-        }
-      },
-      border: getBorderCharacters(`void`),
-      columnDefault: {
-        paddingLeft: 0,
-        paddingRight: 1
-      },
-      drawHorizontalLine: () => {
-        return false;
+  const autoConnectPrinter = async () => {
+    try {
+      const device = await AsyncStorage.getItem("@connectedDeviceId");
+      if (device !== null) {
+        const deviceId = JSON.parse(device);
+        BluetoothSerial.connect(deviceId.id)
+          .then(res => {
+            console.log("Auto connect Success: ", res);
+          })
+          .catch(err => {
+            console.log("Auto connect failed: ", err);
+            navigator.current.dispatch(NavigationActions.navigate({ routeName: "SettingsScreen" }));
+          });
       }
-    };
-    const priceConfig = {
-      columns: {
-        0: {
-          width: 22
-        },
-        1: {
-          alignment: "right",
-          width: 8
-        }
-      },
-      border: getBorderCharacters(`void`),
-      columnDefault: {
-        paddingLeft: 0,
-        paddingRight: 1
-      },
-      drawHorizontalLine: () => {
-        return false;
-      }
-    };
-    let output = table(data, config);
-    let pricesTable = [
-      ["SUBTOTAL", details.payment.totals.subtotal],
-      ["TAX", details.payment.totals.tax],
-      ["TOTAL", details.payment.totals.final]
-    ];
-    if (details.payment.totals.discount != "0.00") {
-      pricesTable.splice(1, 0, ["DISCOUNT", details.payment.totals.discount]);
+    } catch (error) {
+      console.log("Unable to get device id: ", error);
     }
-    if (details.payment.totals.tip != "0.00") {
-      pricesTable.splice(pricesTable.length - 1, 0, ["TIPS", details.payment.totals.tip]);
-    }
-    if (details.payment.totals.fee.usage != "0.00") {
-      pricesTable.splice(pricesTable.length - 1, 0, [
-        "CONVENIENCE FEE",
-        details.payment.totals.fee.usage
-      ]);
-    }
-    let pricesOutput = table(pricesTable, priceConfig);
-    const xml = `
-    <?xml version="1.0" encoding="UTF-8"?>
-    <document>
-      <line-feed />
-      <align mode="center">
-          <bold>
-            <text-line size="1:0">{{header}}</text-line>
-          </bold>
-          <line-feed />
-          <text-line size="0:0">{{add1}}</text-line>
-          <text-line size="0:0">{{add2}}</text-line>
-          <text-line size="0:0">{{add3}}</text-line>
-          <text-line size="0:0">{{tel1}}</text-line>
-      </align>
-      <line-feed />
-      <bold>
-          <text-line size="1:0">CUSTOMER</text-line>
-      </bold>
-      <break-line lines="2" />
-      <text-line size="0:0">{{customer}}</text-line>
-      {{#if showDelivery}}
-      <text-line size="0:0">{{custAdd1}}</text-line>
-      <text-line size="0:0">{{custAdd2}}</text-line>
-      {{/if}}
-      <text-line size="0:0">{{tel2}}</text-line>
-      <line-feed />
-      <bold>
-          <text-line size="1:0">Payment Method</text-line>
-      </bold>
-      <break-line lines="2" />
-      <text-line size="0:0">{{paymentMethod}}</text-line>
-      <line-feed />
-      <bold>
-          <text-line size="1:0">Order Date</text-line>
-      </bold>
-      <break-line lines="2" />
-      <text-line size="0:0">{{orderDate}}</text-line>
-      {{#if isFutureDate}}
-      <line-feed />
-      <bold>
-          <text-line size="1:0">Future Order</text-line>
-      </bold>
-      <break-line lines="2" />
-      <text-line size="0:0">{{futureDate}}</text-line>
-      {{/if}}
-      <line-feed />
-      <align mode="left">
-        <text-line size="0:0">{{table}}</text-line>
-      </align>
-      <line-feed />
-      <text-line size="0:0">{{pricesOutput}}</text-line>
-    </document>
-    `;
-    const detailsData = {
-      header: `${details.type === "pickup" ? "TAKE-OUT" : "DELIVERY"} #${details.order_id}`,
-      add1: details.location.address,
-      add2: details.location.city,
-      add3: `${details.location.state} ${details.location.zip}`,
-      tel1: details.location.telephone,
-      customer: `${details.customer.first} ${details.customer.last}`,
-      tel2: details.customer.telephone,
-      custAdd1: `${details.customer.address.street_number} ${details.customer.address.street}`,
-      custAdd2: `${details.customer.address.city}, ${details.customer.address.state} ${
-        details.customer.address.zipcode
-      }`,
-      subtotal: details.payment.totals.subtotal,
-      tax: details.payment.totals.tax,
-      total: details.payment.totals.final,
-      table: output,
-      pricesOutput: pricesOutput,
-      orderDate: details.local_date,
-      futureDate: details.payment.order_when.date,
-      isFutureDate: details.payment.order_when.date ? true : false,
-      paymentMethod: `${
-        details.payment.method === "cod"
-          ? `Pay on Delivery (${details.payment.details})`
-          : "Pay in Person"
-      }`,
-      showDelivery: details.payment.method === "cod" ? true : false
-    };
-
-    const buffer = EscPos.getBufferFromTemplate(xml, detailsData);
-
-    BluetoothSerial.write(buffer)
-      .then(res => {
-        console.log("Print: ", res);
-        ToastAndroid.showWithGravity(
-          "Print successful",
-          ToastAndroid.LONG,
-          ToastAndroid.BOTTOM,
-          25,
-          50
-        );
-      })
-      .catch(err => {
-        Sentry.captureException(err);
-      });
   };
 
   const fetchOrderDetails = () => {
@@ -262,7 +80,11 @@ const OrderDetails = ({ navigation }) => {
           const res = response.data;
           setOrderDetail(res);
           toggleLoading(false);
-          navigation.setParams({ print: () => orderDetailTable(res) });
+          navigation.setParams({
+            print: () => printReceipt(res),
+            checkBluetooth: () => networkStatus.checkConnection(),
+            connectionStatus: networkStatus.isConnected
+          });
         } else {
           toggleLoading(false);
           setError("Error getting order details");
@@ -508,7 +330,11 @@ OrderDetails.navigationOptions = ({ navigation }) => {
     headerRight: (
       <Icon
         name="print"
-        onPress={navigation.state.params.print}
+        onPress={() => {
+          navigation.state.params.connectionStatus
+            ? navigation.state.params.print()
+            : navigation.state.params.checkBluetooth();
+        }}
         size={25}
         color="#FFFFFF"
         style={{ padding: 10 }}

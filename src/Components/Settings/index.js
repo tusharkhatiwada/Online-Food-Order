@@ -13,9 +13,14 @@ import {
 } from "react-native";
 import BluetoothSerial from "react-native-bluetooth-serial";
 import Icon from "react-native-vector-icons/MaterialIcons";
+import { useKeepAwake } from "expo-keep-awake";
+import uniqBy from "lodash/uniqBy";
+import AsyncStorage from "@react-native-community/async-storage";
 
 var { height, width } = Dimensions.get("window");
 const Settings = ({ navigation }) => {
+  useKeepAwake();
+  const [idFromStorage, setIdFromStorage] = useState(null);
   const [isEnabled, toggleEnable] = useState(false);
   const [device, setDevice] = useState(null);
   const [devices, setDevices] = useState([]);
@@ -30,8 +35,11 @@ const Settings = ({ navigation }) => {
     requestPermission();
   }, []);
   useEffect(() => {
+    getConnectedDeviceId();
+  }, [isEnabled, devices]);
+  useEffect(() => {
     checkConnection();
-  }, []);
+  }, [isEnabled]);
 
   const requestPermission = async () => {
     const granted = await PermissionsAndroid.requestMultiple(
@@ -46,11 +54,45 @@ const Settings = ({ navigation }) => {
     );
   };
 
+  const getConnectedDeviceId = async () => {
+    try {
+      const de = await AsyncStorage.getItem("@connectedDeviceId");
+      if (de !== null) {
+        const id = await JSON.parse(de);
+        setIdFromStorage(id);
+      }
+    } catch (error) {
+      console.log("Error getting connected id: ", error);
+    }
+  };
+
   const checkConnection = () => {
-    Promise.all([BluetoothSerial.isEnabled(), BluetoothSerial.list()]).then(values => {
-      const [enabled, listedDevices] = values;
+    console.log({ idFromStorage });
+    Promise.all([
+      BluetoothSerial.isEnabled(),
+      BluetoothSerial.list(),
+      BluetoothSerial.isConnected()
+    ]).then(values => {
+      const [enabled, listedDevices, connectedDevices] = values;
       toggleEnable(enabled);
-      setDevices(listedDevices);
+      const uniqListedDevices = uniqBy(listedDevices, "id");
+      setDevices(uniqListedDevices);
+      setTimeout(() => {
+        console.log("Connected Devices: ", uniqListedDevices, connectedDevices, idFromStorage);
+        if (!connectedDevices) {
+          uniqListedDevices.map(ld => {
+            console.log("Ld: ", ld, idFromStorage);
+            if (idFromStorage !== null) {
+              if (ld.id === idFromStorage.id) {
+                disconnect();
+                connect(idFromStorage);
+              }
+            }
+          });
+        } else {
+          setDevice(idFromStorage);
+        }
+      }, 100);
     });
     BluetoothSerial.on("bluetoothDisabled", () =>
       Alert.alert("Error", "Bluetooth is disabled. Please enable it.")
@@ -63,7 +105,9 @@ const Settings = ({ navigation }) => {
       setConnected(false);
     });
     navigation.setParams({ scanDevices: () => checkConnection() });
-    discoverUnpaired();
+    if (idFromStorage === null) {
+      discoverUnpaired();
+    }
   };
 
   const discoverUnpaired = () => {
@@ -73,8 +117,8 @@ const Settings = ({ navigation }) => {
       setDiscovering(true);
       BluetoothSerial.discoverUnpairedDevices()
         .then(unpaired => {
+          setUnpairedDevices(uniqBy(unpaired, "id"));
           console.log("Unpaired: ", unpaired);
-          setUnpairedDevices(unpaired);
           setDiscovering(false);
         })
         .catch(err => {
@@ -119,15 +163,25 @@ const Settings = ({ navigation }) => {
       });
   };
 
-  const connect = device => {
+  const storeConnectedDeviceInfo = async dev => {
+    try {
+      await AsyncStorage.setItem("@connectedDeviceId", dev);
+      await AsyncStorage.mergeItem("@connectedDeviceId", dev);
+    } catch (error) {
+      console.log("Unable to store device id: ", error);
+    }
+  };
+
+  const connect = async device => {
     console.log("Connect: ", device);
     setConnecting(true);
-    BluetoothSerial.connect(device.id)
-      .then(res => {
+    await BluetoothSerial.connect(device.id)
+      .then(async res => {
         console.log("Connected: ", res);
-        setDevice(device);
-        setConnected(true);
-        setConnecting(false);
+        await storeConnectedDeviceInfo(JSON.stringify(device));
+        await setDevice(device);
+        await setConnected(true);
+        await setConnecting(false);
       })
       .catch(err => {
         setConnecting(false);

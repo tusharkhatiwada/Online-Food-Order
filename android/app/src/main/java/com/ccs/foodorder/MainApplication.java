@@ -3,6 +3,9 @@ package com.ccs.foodorder;
 import android.app.Application;
 
 import com.facebook.react.ReactApplication;
+import com.dieam.reactnativepushnotification.ReactNativePushNotificationPackage;
+import com.solinor.bluetoothstatus.RNBluetoothManagerPackage;
+import com.reactnativecommunity.netinfo.NetInfoPackage;
 import com.rusel.RCTBluetoothSerial.*;
 import io.sentry.RNSentryPackage;
 import com.reactnativecommunity.asyncstorage.AsyncStoragePackage;
@@ -14,11 +17,17 @@ import com.facebook.react.ReactNativeHost;
 import com.facebook.react.ReactPackage;
 import com.facebook.react.shell.MainReactPackage;
 import com.facebook.soloader.SoLoader;
+import com.ccs.foodorder.generated.BasePackageList;
+
+import org.unimodules.adapters.react.ModuleRegistryAdapter;
+import org.unimodules.adapters.react.ReactModuleRegistryProvider;
+import org.unimodules.core.interfaces.SingletonModule;
 
 import java.util.Arrays;
 import java.util.List;
 
 public class MainApplication extends Application implements ReactApplication {
+  private final ReactModuleRegistryProvider mModuleRegistryProvider = new ReactModuleRegistryProvider(new BasePackageList().getPackageList(), Arrays.<SingletonModule>asList());
 
   private final ReactNativeHost mReactNativeHost = new ReactNativeHost(this) {
     @Override
@@ -30,6 +39,10 @@ public class MainApplication extends Application implements ReactApplication {
     protected List<ReactPackage> getPackages() {
       return Arrays.<ReactPackage>asList(
           new MainReactPackage(),
+            new ReactNativePushNotificationPackage(),
+            new RNBluetoothManagerPackage(),
+          new ModuleRegistryAdapter(mModuleRegistryProvider),
+            new NetInfoPackage(),
             new RCTBluetoothSerialPackage(),
             new RNSentryPackage(),
             new AsyncStoragePackage(),
