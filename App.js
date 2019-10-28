@@ -115,20 +115,18 @@ const App = () => {
 
   const getToken = async () => {
     try {
-      const token = await AsyncStorage.getItem("@ccs_token"); // token = 3808bfe5-7efd-4fcc-b314-5d7420b694f5  (from the login response)
+      const token = await AsyncStorage.getItem("@ccs_token");
       if (token !== null) {
-        let encode = Base64.btoa(`WEB;${Math.floor(Date.now() / 1000)};GET;/Orders/1`); // Base64 Encoding. Output: V0VCOzE1NzExNTIzNzM4MzE7R0VUOy9PcmRlcnMvMQ==
-        let digest = CryptoJS.HmacSHA256(encode, "d80b301b98c1f309351e36a9").toString(); // sha256 hash the encoded output with a secret key. The secret is from the API titled Mobile App on Developers section. Output: 75a255586e9d9e8a5f7ce0b3de89e1651c92c3c4adb5e2d2a66ebf90e602dad6
-        console.log("Crypto: ", digest, token, Math.floor(Date.now() / 1000), Date.now());
-        axios.defaults.headers.common["Content-Type"] = "application/json";
+        let encode = Base64.btoa(`WEB;${Math.floor(Date.now() / 1000)};GET;/Orders/1/50`);
+        let digest = CryptoJS.HmacSHA256(encode, "d80b301b98c1f309351e36a9").toString();
         axios.defaults.headers.common["Authorization"] = `Bearer WEB_${token};${Math.floor(
           Date.now() / 1000
-        )};${digest}`; // Authorization header here. OutPut: Bearer WEB_3808bfe5-7efd-4fcc-b314-5d7420b694f5;1571152566918;75a255586e9d9e8a5f7ce0b3de89e1651c92c3c4adb5e2d2a66ebf90e602dad6
+        )};${digest}`;
         navigator.current.dispatch(NavigationActions.navigate({ routeName: "Home" }));
       }
     } catch (e) {
       console.log("Error on app.js: ", { e });
-      // error reading value
+      Sentry.captureException(e);
     }
   };
   const autoConnectPrinter = async () => {

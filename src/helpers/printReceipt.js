@@ -4,15 +4,28 @@ import { Sentry } from "react-native-sentry";
 import { table, getBorderCharacters } from "table";
 import { EscPos } from "escpos-xml";
 import axios from "axios";
+import CryptoJS from "crypto-js";
+import Base64 from "Base64";
+import values from "lodash/values";
 
-export const fetchOrderDetails = id => {
+export const fetchOrderDetails = async id => {
+  const token = await AsyncStorage.getItem("@ccs_token");
+  let encode = Base64.btoa(`WEB;${Math.floor(Date.now() / 1000)};GET;/Orders/${id}`);
+  let digest = CryptoJS.HmacSHA256(encode, "d80b301b98c1f309351e36a9").toString();
   console.log("Now Order: ", id);
-  axios
-    .get(`/Orders/Id/${id}`)
+  axios({
+    method: "get",
+    url: `/Orders/${id}`,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer WEB_${token};${Math.floor(Date.now() / 1000)};${digest}`
+    },
+    data: {}
+  })
     .then(response => {
       if (response.status == 200) {
         const res = response.data;
-        printReceipt(res);
+        printReceipt(res[0]);
       }
     })
     .catch(err => {
@@ -26,7 +39,7 @@ const generateItemRow = item => {
 };
 
 const cartInfo = cart => {
-  return cart.prices
+  return values(cart.prices)
     .map(cp => {
       return `\n${cp.info.name.length > 0 ? `**${cp.info.name}**\n` : ``}\n${
         cp.modules.length !== 0 ? toppingsInfo(cp.modules) : "*"
@@ -42,12 +55,12 @@ const toppingsInfo = toppings => {
       .map(top => {
         return `${top.name}\n${
           top.chosen
-            ? top.chosen
+            ? values(top.chosen)
                 .map(chosen => {
                   return ` ${chosen.name}`;
                 })
                 .join("\n")
-            : top.toppings
+            : values(top.toppings)
                 .map(t => {
                   return ` ${t.topping} (${t.chosen.placement})`;
                 })
@@ -58,7 +71,7 @@ const toppingsInfo = toppings => {
   }
 };
 const printReceipt = async details => {
-  const items = details.data;
+  const items = values(details.data);
   let itemsTable = [];
 
   await items.map(async item => {
@@ -75,7 +88,7 @@ const printReceipt = async details => {
     columns: {
       0: {},
       1: {
-        width: 21
+        width: 31
       },
       2: {
         alignment: "right"
@@ -93,11 +106,11 @@ const printReceipt = async details => {
   const priceConfig = {
     columns: {
       0: {
-        width: 22
+        width: 32
       },
       1: {
         alignment: "right",
-        width: 8
+        width: 12
       }
     },
     border: getBorderCharacters(`void`),
@@ -181,6 +194,8 @@ const printReceipt = async details => {
     </align>
     <line-feed />
     <text-line size="0:0">{{pricesOutput}}</text-line>
+    <line-feed />
+    <text-line size="0:0">ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghizklmnopqrstuvwxyz</text-line>
   </document>
   `;
   const detailsData = {

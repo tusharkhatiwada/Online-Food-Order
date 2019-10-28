@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from "react";
+import React, { useState, useEffect, useContext, useRef } from "react";
 import {
   View,
   ScrollView,
@@ -6,12 +6,18 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  ToastAndroid
+  ToastAndroid,
+  Dimensions,
+  Image,
+  CameraRoll
 } from "react-native";
+import ViewShot from "react-native-view-shot";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import AsyncStorage from "@react-native-community/async-storage";
 import { useNavigationParam, useNavigationEvents } from "react-navigation-hooks";
 import axios from "axios";
+import CryptoJS from "crypto-js";
+import Base64 from "Base64";
 // import { BluetoothEscposPrinter } from "react-native-bluetooth-escpos-printer";
 import BluetoothSerial from "react-native-bluetooth-serial";
 import { Sentry } from "react-native-sentry";
@@ -19,17 +25,23 @@ import { table, getBorderCharacters } from "table";
 import { EscPos } from "escpos-xml";
 import chalk from "chalk";
 import { useKeepAwake } from "expo-keep-awake";
-import printReceipt from "../../helpers/printReceipt";
+// // import printReceipt from "../../helpers/printReceipt";
+import { printOrderReceipt } from "../Print";
+import values from "lodash/values";
 
 import { NetworkContext } from "../../helpers/networkProvider";
 
+const { height, width } = Dimensions.get("window");
+
 const OrderDetails = ({ navigation }) => {
+  const viewShot = useRef(null);
   const networkStatus = useContext(NetworkContext);
   useKeepAwake();
   const id = useNavigationParam("id");
   const [loading, toggleLoading] = useState(true);
   const [orderDetail, setOrderDetail] = useState(null);
   const [error, setError] = useState(null);
+  const [img, setImg] = useState(null);
   useEffect(() => {
     networkStatus.checkConnection();
   }, []);
@@ -50,6 +62,7 @@ const OrderDetails = ({ navigation }) => {
       })
       .catch(err => {
         console.log("Error connection status: ", err.message);
+        Sentry.captureException(err);
       });
   };
 
@@ -72,26 +85,218 @@ const OrderDetails = ({ navigation }) => {
     }
   };
 
-  const fetchOrderDetails = () => {
-    axios
-      .get(`/Orders/Id/${id}`)
+  const renderPrintView = () => {
+    const items = values(orderDetail.data);
+    const orderId = orderDetail.order_id.toString();
+    return(
+      <ViewShot ref={viewShot} options={{ format: "jpg", quality: 0.9 }}>
+      <ScrollView contentContainerStyle={styles.printContainer}>
+      <View style={styles.topContent}>
+      <Text style={styles.orderType}>{`${
+        orderDetail.type === "pickup" ? "TAKE-OUT" : "DELIVERY"
+      } #${orderId}`}</Text>
+      <View style={styles.addressContainer}>
+        {orderDetail.location && (
+          <Text style={styles.address}>{orderDetail.location.address}</Text>
+        )}
+        {orderDetail.location && (
+          <Text style={styles.address}>{orderDetail.location.city}</Text>
+        )}
+        <Text style={styles.address}>
+          {orderDetail.location && orderDetail.location.state}{" "}
+          {orderDetail.location && orderDetail.location.zip}
+        </Text>
+        {orderDetail.location && (
+          <Text style={styles.address}>{orderDetail.location.telephone}</Text>
+        )}
+      </View>
+    </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 18, color: "black", fontWeight: "bold" }}>CUSTOMER</Text>
+              <Text style={{ fontSize: 16 }}>
+                {orderDetail.customer.first} {orderDetail.customer.last}
+              </Text>
+              {orderDetail.customer.address && <React.Fragment><Text style={{ fontSize: 16 }}>
+              {`${orderDetail.customer.address ? orderDetail.customer.address.street_number : ""} ${
+                orderDetail.customer.address ? orderDetail.customer.address.street : ""
+              }`}
+              </Text>
+              <Text style={{ fontSize: 16 }}>
+              {`${orderDetail.customer.address ? orderDetail.customer.address.city : ""}, ${
+                orderDetail.customer.address ? orderDetail.customer.address.state : ""
+              } ${orderDetail.customer.address ? orderDetail.customer.address.zipcode : ""}`}
+              </Text></React.Fragment>}
+              {orderDetail.customer.telephone && (
+                <Text style={{ fontSize: 16 }}>{orderDetail.customer.telephone}</Text>
+              )}
+            </View>
+            <View style={{ flex: 1 }}>
+              <View>
+                <Text style={{ fontSize: 18, color: "black", fontWeight: "bold" }}>Payment Method:</Text>
+                <Text style={{ fontSize: 16 }}>{`${
+                  orderDetail.payment.method === "cod"
+                    ? `Pay on Delivery (${orderDetail.payment.details})`
+                    : "Pay in Person"
+                }`}</Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: 18, color: "black", fontWeight: "bold" }}>Order Date:</Text>
+                <Text style={{ fontSize: 16 }}>{orderDetail.local_date}</Text>
+              </View>
+              {orderDetail.payment.order_when.date && (
+                <View>
+                  <Text style={{ fontSize: 18, color: "black", fontWeight: "bold" }}>Future Order:</Text>
+                  <Text style={{ fontSize: 16 }}>{orderDetail.payment.order_when.date}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.orderSummary}>
+            <Text style={{ fontSize: 20, fontWeight: "bold", textAlign: "center", color: "black" }}>
+              ORDER SUMMARY
+            </Text>
+            <View style={styles.summaryHeader}>
+              <Text style={[styles.th, { flex: 1 }]}>Qty</Text>
+              <Text style={[styles.th, { flex: 3 }]}>Item</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>Totals</Text>
+            </View>
+            {items.map(item => {
+              return (
+                <View style={styles.summaryBody} key={item.cost.item.item_id}>
+                  <Text style={[styles.td, { flex: 1 }]}>{item.cost.quantity}</Text>
+                  <View style={{ flex: 3 }}>
+                    <Text style={styles.td}>
+                      {item.cost.item.item} ({parseFloat(item.cost.cost.final)})
+                    </Text>
+                    {values(item.cart.prices).map(cp => (
+                      <View key={cp.info.id}>
+                        {cp.info.name.length > 0 && (
+                          <Text style={{ fontWeight: "bold", color: "black", paddingVertical: 8 }}>
+                            ***{cp.info.name}*** {parseFloat(cp.info.cost)}
+                          </Text>
+                        )}
+                        {renderToppings(cp.modules)}
+                      </View>
+                    ))}
+                    {item.cost.item.note.length > 0 && (
+                      <View>
+                        <Text
+                          style={{
+                            fontWeight: "bold",
+                            color: "black",
+                            paddingTop: 8,
+                            paddingBottom: 3
+                          }}
+                        >
+                          CUSTOMER NOTE
+                        </Text>
+                        <Text style={{ paddingLeft: 8 }}>{item.cost.item.note}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.td, { flex: 1, textAlign: "right" }]}>
+                    {Math.round(
+                      parseFloat(item.cost.cost.final) * parseFloat(item.cost.quantity) * 100
+                    ) / 100}
+                  </Text>
+                </View>
+              );
+            })}
+            <View style={styles.hr} />
+            <View style={styles.summaryFooter}>
+              <Text style={[styles.th, { flex: 1 }]} />
+              <Text style={[styles.th, { flex: 3 }]}>SUBTOTAL</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                {orderDetail.payment.totals.subtotal}
+              </Text>
+            </View>
+            {orderDetail.payment.totals.discount != "0.00" && (
+              <View style={styles.summaryFooter}>
+                <Text style={[styles.th, { flex: 1 }]} />
+                <Text style={[styles.th, { flex: 3 }]}>DISCOUNT</Text>
+                <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                  {orderDetail.payment.totals.discount}
+                </Text>
+              </View>
+            )}
+            <View style={styles.summaryFooter}>
+              <Text style={[styles.th, { flex: 1 }]} />
+              <Text style={[styles.th, { flex: 3 }]}>TAX</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                {orderDetail.payment.totals.tax}
+              </Text>
+            </View>
+            {orderDetail.payment.totals.tip != "0.00" && (
+              <View style={styles.summaryFooter}>
+                <Text style={[styles.th, { flex: 1 }]} />
+                <Text style={[styles.th, { flex: 3 }]}>TIPS</Text>
+                <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                  {orderDetail.payment.totals.tip}
+                </Text>
+              </View>
+            )}
+            {orderDetail.payment.totals.fee.usage != "0.00" && (
+              <View style={styles.summaryFooter}>
+                <Text style={[styles.th, { flex: 1 }]} />
+                <Text style={[styles.th, { flex: 3 }]}>CONVENIENCE FEE</Text>
+                <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                  {orderDetail.payment.totals.fee.usage}
+                </Text>
+              </View>
+            )}
+            <View style={styles.summaryFooter}>
+              <Text style={[styles.th, { flex: 1 }]} />
+              <Text style={[styles.th, { flex: 3 }]}>TOTAL</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                {orderDetail.payment.totals.final}
+              </Text>
+            </View>
+          </View>
+          </ScrollView>
+      </ViewShot>
+    );
+  }
+
+  const fetchOrderDetails = async () => {
+    const token = await AsyncStorage.getItem("@ccs_token");
+    let encode = Base64.btoa(`WEB;${Math.floor(Date.now() / 1000)};GET;/Orders/${id}`);
+    let digest = CryptoJS.HmacSHA256(encode, "d80b301b98c1f309351e36a9").toString();
+    axios({
+      method: "get",
+      url: `/Orders/${id}`,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer WEB_${token};${Math.floor(Date.now() / 1000)};${digest}`
+      },
+      data: {}
+    })
       .then(response => {
+        console.log("Response: ", response);
         if (response.status == 200) {
           const res = response.data;
-          setOrderDetail(res);
+          setOrderDetail(res[0]);
           toggleLoading(false);
-          navigation.setParams({
-            print: () => printReceipt(res),
-            checkBluetooth: () => networkStatus.checkConnection(),
-            connectionStatus: networkStatus.isConnected
-          });
+          viewShot.current
+            .capture()
+            .then(uri => {
+              setImg(uri);
+              // CameraRoll.saveToCameraRoll(uri);
+              navigation.setParams({
+                print: () => printOrderReceipt(uri),
+                checkBluetooth: () => networkStatus.checkConnection(),
+                connectionStatus: networkStatus.isConnected
+              });
+            })
+            .catch(err => {
+              console.log("Error generating image: ", err);
+            });
         } else {
           toggleLoading(false);
           setError("Error getting order details");
         }
       })
       .catch(err => {
-        console.log("Error getting Orders: ", err);
+        console.log("Error getting Orders: ", { err });
+        Sentry.captureException(err);
       });
   };
   const renderToppings = toppings => {
@@ -100,7 +305,7 @@ const OrderDetails = ({ navigation }) => {
       <View key={top.id}>
         <Text style={{ fontWeight: "bold", color: "black" }}>{top.name}</Text>
         {top.chosen
-          ? top.chosen.map(chosen => (
+          ? values(top.chosen).map(chosen => (
               <Text
                 key={chosen.id}
                 style={{ paddingLeft: 6, textTransform: "uppercase", fontSize: 12 }}
@@ -108,7 +313,7 @@ const OrderDetails = ({ navigation }) => {
                 {chosen.quantity}X {chosen.name} ({parseFloat(chosen.final_cost)})
               </Text>
             ))
-          : top.toppings.map(t => (
+          : values(top.toppings).map(t => (
               <Text
                 key={t.chosen.id}
                 style={{ paddingLeft: 6, textTransform: "uppercase", fontSize: 12 }}
@@ -128,180 +333,173 @@ const OrderDetails = ({ navigation }) => {
       </View>
     );
   } else {
-    const items = orderDetail.data;
+    const items = values(orderDetail.data);
+    const orderId = orderDetail.order_id.toString();
     return (
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.topContent}>
-          <Text style={styles.orderType}>{`${
-            orderDetail.type === "pickup" ? "TAKE-OUT" : "DELIVERY"
-          } #${orderDetail.order_id}`}</Text>
-          <View style={styles.addressContainer}>
-            {orderDetail.location && (
-              <Text style={styles.address}>{orderDetail.location.address}</Text>
-            )}
-            {orderDetail.location && (
-              <Text style={styles.address}>{orderDetail.location.city}</Text>
-            )}
-            <Text style={styles.address}>
-              {orderDetail.location && orderDetail.location.state}{" "}
-              {orderDetail.location && orderDetail.location.zip}
-            </Text>
-            {orderDetail.location && (
-              <Text style={styles.address}>{orderDetail.location.telephone}</Text>
-            )}
-          </View>
-        </View>
-        <View style={styles.hr} />
-        <View style={styles.customerDetail}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 18, color: "black" }}>CUSTOMER:</Text>
-            <Text style={{ fontSize: 16 }}>
-              {orderDetail.customer.first} {orderDetail.customer.last}
-            </Text>
-            {orderDetail.customer.telephone && (
-              <Text style={{ fontSize: 16 }}>{orderDetail.customer.telephone}</Text>
-            )}
-          </View>
-          <View style={{ flex: 1 }}>
-            <View>
-              <Text style={{ fontSize: 18, color: "black" }}>Order Date:</Text>
-              <Text style={{ fontSize: 16 }}>{orderDetail.local_date}</Text>
-            </View>
-            {orderDetail.payment.order_when.date && (
-              <View>
-                <Text style={{ fontSize: 18, color: "black" }}>Future Order:</Text>
-                <Text style={{ fontSize: 16 }}>{orderDetail.payment.order_when.date}</Text>
-              </View>
-            )}
-          </View>
-        </View>
-        <View>
-          <View style={{ marginVertical: 10 }}>
-            <Text style={{ fontSize: 18, color: "black" }}>PAYMENT METHOD:</Text>
-            <Text style={{ fontSize: 16 }}>
-              Pay in person {orderDetail.payment.method === "cod" && "(Delivery)"}
-            </Text>
-          </View>
-          {orderDetail.payment.method === "cod" && (
-            <View>
-              <Text style={{ fontSize: 18, color: "black" }}>DELIVERY:</Text>
+        <ViewShot ref={viewShot} options={{ format: "png", quality: 0.9, result: 'base64' }}>
+      <ScrollView contentContainerStyle={styles.printContainer}>
+      <View style={styles.topContent}>
+      <Text style={styles.orderType}>{`${
+        orderDetail.type === "pickup" ? "TAKE-OUT" : "DELIVERY"
+      } #${orderId}`}</Text>
+      <View style={styles.addressContainer}>
+        {orderDetail.location && (
+          <Text style={styles.address}>{orderDetail.location.address}</Text>
+        )}
+        {orderDetail.location && (
+          <Text style={styles.address}>{orderDetail.location.city}</Text>
+        )}
+        <Text style={styles.address}>
+          {orderDetail.location && orderDetail.location.state}{" "}
+          {orderDetail.location && orderDetail.location.zip}
+        </Text>
+        {orderDetail.location && (
+          <Text style={styles.address}>{orderDetail.location.telephone}</Text>
+        )}
+      </View>
+    </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 18, color: "black", fontWeight: "bold" }}>CUSTOMER</Text>
               <Text style={{ fontSize: 16 }}>
-                {orderDetail.customer && orderDetail.customer.address.street_number}{" "}
-                {orderDetail.customer && orderDetail.customer.address.street}
+                {orderDetail.customer.first} {orderDetail.customer.last}
               </Text>
-              {orderDetail.customer && (
-                <Text style={{ fontSize: 16 }}>{orderDetail.customer.address.city}</Text>
+              {orderDetail.customer.address && <React.Fragment><Text style={{ fontSize: 16 }}>
+              {`${orderDetail.customer.address ? orderDetail.customer.address.street_number : ""} ${
+                orderDetail.customer.address ? orderDetail.customer.address.street : ""
+              }`}
+              </Text>
+              <Text style={{ fontSize: 16 }}>
+              {`${orderDetail.customer.address ? orderDetail.customer.address.city : ""}, ${
+                orderDetail.customer.address ? orderDetail.customer.address.state : ""
+              } ${orderDetail.customer.address ? orderDetail.customer.address.zipcode : ""}`}
+              </Text></React.Fragment>}
+              {orderDetail.customer.telephone && (
+                <Text style={{ fontSize: 16 }}>{orderDetail.customer.telephone}</Text>
               )}
-              <Text style={{ fontSize: 16 }}>
-                {orderDetail.customer && orderDetail.customer.address.state}{" "}
-                {orderDetail.customer && orderDetail.customer.address.zipcode}
+            </View>
+            <View style={{ flex: 1 }}>
+              <View>
+                <Text style={{ fontSize: 18, color: "black", fontWeight: "bold" }}>Payment Method:</Text>
+                <Text style={{ fontSize: 16 }}>{`${
+                  orderDetail.payment.method === "cod"
+                    ? `Pay on Delivery (${orderDetail.payment.details})`
+                    : "Pay in Person"
+                }`}</Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: 18, color: "black", fontWeight: "bold" }}>Order Date:</Text>
+                <Text style={{ fontSize: 16 }}>{orderDetail.local_date}</Text>
+              </View>
+              {orderDetail.payment.order_when.date && (
+                <View>
+                  <Text style={{ fontSize: 18, color: "black", fontWeight: "bold" }}>Future Order:</Text>
+                  <Text style={{ fontSize: 16 }}>{orderDetail.payment.order_when.date}</Text>
+                </View>
+              )}
+            </View>
+            <View style={styles.orderSummary}>
+            <Text style={{ fontSize: 20, fontWeight: "bold", textAlign: "center", color: "black" }}>
+              ORDER SUMMARY
+            </Text>
+            <View style={styles.summaryHeader}>
+              <Text style={[styles.th, { flex: 1 }]}>Qty</Text>
+              <Text style={[styles.th, { flex: 3 }]}>Item</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>Totals</Text>
+            </View>
+            {items.map(item => {
+              return (
+                <View style={styles.summaryBody} key={item.cost.item.item_id}>
+                  <Text style={[styles.td, { flex: 1 }]}>{item.cost.quantity}</Text>
+                  <View style={{ flex: 3 }}>
+                    <Text style={styles.td}>
+                      {item.cost.item.item} ({parseFloat(item.cost.cost.final)})
+                    </Text>
+                    {values(item.cart.prices).map(cp => (
+                      <View key={cp.info.id}>
+                        {cp.info.name.length > 0 && (
+                          <Text style={{ fontWeight: "bold", color: "black", paddingVertical: 8 }}>
+                            ***{cp.info.name}*** {parseFloat(cp.info.cost)}
+                          </Text>
+                        )}
+                        {renderToppings(cp.modules)}
+                      </View>
+                    ))}
+                    {item.cost.item.note.length > 0 && (
+                      <View>
+                        <Text
+                          style={{
+                            fontWeight: "bold",
+                            color: "black",
+                            paddingTop: 8,
+                            paddingBottom: 3
+                          }}
+                        >
+                          CUSTOMER NOTE
+                        </Text>
+                        <Text style={{ paddingLeft: 8 }}>{item.cost.item.note}</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.td, { flex: 1, textAlign: "right" }]}>
+                    {Math.round(
+                      parseFloat(item.cost.cost.final) * parseFloat(item.cost.quantity) * 100
+                    ) / 100}
+                  </Text>
+                </View>
+              );
+            })}
+            <View style={styles.hr} />
+            <View style={styles.summaryFooter}>
+              <Text style={[styles.th, { flex: 1 }]} />
+              <Text style={[styles.th, { flex: 3 }]}>SUBTOTAL</Text>
+              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                {orderDetail.payment.totals.subtotal}
               </Text>
             </View>
-          )}
-        </View>
-        <View style={styles.hr} />
-        <View style={styles.orderSummary}>
-          <Text style={{ fontSize: 20, fontWeight: "bold", textAlign: "center", color: "black" }}>
-            ORDER SUMMARY
-          </Text>
-          <View style={styles.summaryHeader}>
-            <Text style={[styles.th, { flex: 1 }]}>Qty</Text>
-            <Text style={[styles.th, { flex: 3 }]}>Item</Text>
-            <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>Totals</Text>
-          </View>
-          {items.map(item => {
-            return (
-              <View style={styles.summaryBody} key={item.cost.item.item_id}>
-                <Text style={[styles.td, { flex: 1 }]}>{item.cost.quantity}</Text>
-                <View style={{ flex: 3 }}>
-                  <Text style={styles.td}>
-                    {item.cost.item.item} ({parseFloat(item.cost.cost.final)})
-                  </Text>
-                  {item.cart.prices.map(cp => (
-                    <View key={cp.info.id}>
-                      {cp.info.name.length > 0 && (
-                        <Text style={{ fontWeight: "bold", color: "black", paddingVertical: 8 }}>
-                          ***{cp.info.name}*** {parseFloat(cp.info.cost)}
-                        </Text>
-                      )}
-                      {renderToppings(cp.modules)}
-                    </View>
-                  ))}
-                  {item.cost.item.note.length > 0 && (
-                    <View>
-                      <Text
-                        style={{
-                          fontWeight: "bold",
-                          color: "black",
-                          paddingTop: 8,
-                          paddingBottom: 3
-                        }}
-                      >
-                        CUSTOMER NOTE
-                      </Text>
-                      <Text style={{ paddingLeft: 8 }}>{item.cost.item.note}</Text>
-                    </View>
-                  )}
-                </View>
-                <Text style={[styles.td, { flex: 1, textAlign: "right" }]}>
-                  {Math.round(
-                    parseFloat(item.cost.cost.final) * parseFloat(item.cost.quantity) * 100
-                  ) / 100}
+            {orderDetail.payment.totals.discount != "0.00" && (
+              <View style={styles.summaryFooter}>
+                <Text style={[styles.th, { flex: 1 }]} />
+                <Text style={[styles.th, { flex: 3 }]}>DISCOUNT</Text>
+                <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                  {orderDetail.payment.totals.discount}
                 </Text>
               </View>
-            );
-          })}
-          <View style={styles.hr} />
-          <View style={styles.summaryFooter}>
-            <Text style={[styles.th, { flex: 1 }]} />
-            <Text style={[styles.th, { flex: 3 }]}>SUBTOTAL</Text>
-            <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
-              {orderDetail.payment.totals.subtotal}
-            </Text>
-          </View>
-          {orderDetail.payment.totals.discount != "0.00" && (
+            )}
             <View style={styles.summaryFooter}>
               <Text style={[styles.th, { flex: 1 }]} />
-              <Text style={[styles.th, { flex: 3 }]}>DISCOUNT</Text>
+              <Text style={[styles.th, { flex: 3 }]}>TAX</Text>
               <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
-                {orderDetail.payment.totals.discount}
+                {orderDetail.payment.totals.tax}
               </Text>
             </View>
-          )}
-          <View style={styles.summaryFooter}>
-            <Text style={[styles.th, { flex: 1 }]} />
-            <Text style={[styles.th, { flex: 3 }]}>TAX</Text>
-            <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
-              {orderDetail.payment.totals.tax}
-            </Text>
-          </View>
-          {orderDetail.payment.totals.tip != "0.00" && (
+            {orderDetail.payment.totals.tip != "0.00" && (
+              <View style={styles.summaryFooter}>
+                <Text style={[styles.th, { flex: 1 }]} />
+                <Text style={[styles.th, { flex: 3 }]}>TIPS</Text>
+                <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                  {orderDetail.payment.totals.tip}
+                </Text>
+              </View>
+            )}
+            {orderDetail.payment.totals.fee.usage != "0.00" && (
+              <View style={styles.summaryFooter}>
+                <Text style={[styles.th, { flex: 1 }]} />
+                <Text style={[styles.th, { flex: 3 }]}>CONVENIENCE FEE</Text>
+                <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
+                  {orderDetail.payment.totals.fee.usage}
+                </Text>
+              </View>
+            )}
             <View style={styles.summaryFooter}>
               <Text style={[styles.th, { flex: 1 }]} />
-              <Text style={[styles.th, { flex: 3 }]}>TIPS</Text>
+              <Text style={[styles.th, { flex: 3 }]}>TOTAL</Text>
               <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
-                {orderDetail.payment.totals.tip}
+                {orderDetail.payment.totals.final}
               </Text>
             </View>
-          )}
-          {orderDetail.payment.totals.fee.usage != "0.00" && (
-            <View style={styles.summaryFooter}>
-              <Text style={[styles.th, { flex: 1 }]} />
-              <Text style={[styles.th, { flex: 3 }]}>CONVENIENCE FEE</Text>
-              <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
-                {orderDetail.payment.totals.fee.usage}
-              </Text>
-            </View>
-          )}
-          <View style={styles.summaryFooter}>
-            <Text style={[styles.th, { flex: 1 }]} />
-            <Text style={[styles.th, { flex: 3 }]}>TOTAL</Text>
-            <Text style={[styles.th, { flex: 1, textAlign: "right" }]}>
-              {orderDetail.payment.totals.final}
-            </Text>
           </View>
-        </View>
-      </ScrollView>
+          </ScrollView>
+      </ViewShot>
     );
   }
 };
@@ -348,7 +546,15 @@ const styles = StyleSheet.create({
     margin: 20,
     padding: 20,
     borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.2)"
+    borderColor: "rgba(0,0,0,0.2)",
+    backgroundColor: "white"
+  },
+  printContainer: {
+    margin: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.2)",
+    backgroundColor: "white"
   },
   error: {
     color: "firebrick",
@@ -366,7 +572,9 @@ const styles = StyleSheet.create({
     alignItems: "center"
   },
   orderType: {
-    fontSize: 28,
+    width: width,
+    textAlign: "center",
+    fontSize: 24,
     fontWeight: "bold",
     color: "black",
     paddingVertical: 10

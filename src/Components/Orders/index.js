@@ -14,6 +14,10 @@ import difference from "lodash/difference";
 import AsyncStorage from "@react-native-community/async-storage";
 import { useNetInfo } from "@react-native-community/netinfo";
 import { useKeepAwake } from "expo-keep-awake";
+import values from "lodash/values";
+import { Sentry } from "react-native-sentry";
+import Base64 from "Base64";
+import CryptoJS from "crypto-js";
 
 import NotifService from "../../../NotifService";
 
@@ -29,29 +33,39 @@ const Orders = () => {
   const [error, setError] = useState(null);
   const [loading, toggleLoading] = useState(true);
   const [orderData, setOrderData] = useState([]);
-  const notif = new NotifService(onNotif);
+  // const notif = new NotifService(onNotif);
   useInterval(() => {
     fetchOrders();
   }, 30000);
   useEffect(() => {
     fetchOrders(false);
   }, []);
-  const onNotif = notif => {
-    console.log(notif.title, notif.message);
-  };
-  const fetchOrders = (poll = true) => {
+  // const onNotif = notif => {
+  //   console.log(notif.title, notif.message);
+  // };
+  const fetchOrders = async (poll = true) => {
+    const token = await AsyncStorage.getItem("@ccs_token");
+    let encode = Base64.btoa(`WEB;${Math.floor(Date.now() / 1000)};GET;/Orders/1/50`);
+    let digest = CryptoJS.HmacSHA256(encode, "d80b301b98c1f309351e36a9").toString();
     !poll && toggleLoading(true);
-    axios
-      .get("/Orders/1")
+    axios({
+      method: "GET",
+      url: "/Orders/1/50",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer WEB_${token};${Math.floor(Date.now() / 1000)};${digest}`
+      },
+      data: {}
+    })
       .then(response => {
-        console.log("Orders: ", response);
         if (response.status == 200) {
-          const res = response.data;
+          const res = values(response.data);
           const ids = [];
           for (let i in res) {
             ids.push(res[i].id);
           }
           const distinctIds = [...new Set(ids)];
+          console.log("Orders: ", res);
           !poll && toggleLoading(false);
           setOrders(res);
           if (poll) {
@@ -65,7 +79,8 @@ const Orders = () => {
         }
       })
       .catch(err => {
-        console.log("Error getting Orders: ", { err });
+        console.log("Error getting Orders: ", { err }, JSON.stringify(err));
+        Sentry.captureException(JSON.stringify(err));
         toggleLoading(false);
         setError("Error getting list of orders");
       });

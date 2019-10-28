@@ -4,6 +4,7 @@ import axios from "axios";
 import AsyncStorage from "@react-native-community/async-storage";
 import { NavigationActions } from "react-navigation";
 import { useNavigation } from "react-navigation-hooks";
+import { Sentry } from "react-native-sentry";
 
 import logo from "../../assets/icon.png";
 
@@ -40,7 +41,6 @@ const Login = () => {
         const res = response.data;
         console.log("Token: ", res);
         if (res && res.token) {
-          axios.defaults.headers.common["Content-Type"] = "application/json";
           storeToken(res.token);
         } else {
           setError("Error! Please try again");
@@ -50,6 +50,7 @@ const Login = () => {
       .catch(err => {
         setError("Error! Please try again");
         toggleLoading(false);
+        Sentry.captureException(err);
         console.log("Error on login: ", { err });
       });
   };
@@ -60,6 +61,7 @@ const Login = () => {
       await toggleLoading(false);
       await navigate("Home");
     } catch (e) {
+      Sentry.captureException(e);
       setError("Error! Please try again");
     }
   };
